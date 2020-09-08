@@ -430,21 +430,27 @@ class SLIC(object):
             showCenters - (Bool)  Boolean value representing if output will have cluster centers marked
             path - (Str)    name of file
         """
-        
+        print('executing SLIC on: '+path)
+        print('initializing clusters..')
         self.initializeClusters()
+        print('updating clusters..')
         self.updateClusters()
         
         for i in range(iterations):
-            
+            print('starting loop {}..'.format(i+1))
             start = timeit.default_timer()
             #self.labelPixels(labWeight)
+            print('assigning pixels to clusters..')
             self.labelPixels()
+            print('updating cluster centers..')
             self.updateCenters()
+            print('ensuring connections..')
             self.enforceConnectivity()
             name = '{name}_M{m}_K{k}_loop{loop}.png'.format(name = path, loop = i+1, m = self.M, k = self.K)
             stop = timeit.default_timer()
-            print("Runtime: ", stop - start)
+            print('saving image..')
             self.saveImage(name, showBorders, showCenters)
+            print("Runtime: ", stop - start)
     
     def __init__(self, filepath, K = 10000, M = 10):
         
