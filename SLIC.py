@@ -2,6 +2,8 @@ import math
 import numpy as np
 from skimage import io, color
 import timeit # DEBUG
+import argparse
+import os
 
 class Cluster(object):
     
@@ -94,9 +96,13 @@ class SLIC(object):
             # Handle coordinates on edge
             if not (x + 1 < self.width):
                 x = self.width - 2
+            if not (x > 0):
+                x = 1
             
             if not (y + 1 < self.height):
                 y = self.height - 2
+            if not (y > 0):
+                y = 1
             
             # Computes the gradient using L2 norm
             Gx = np.linalg.norm(self.colorArr[y][x + 1] - self.colorArr[y][x - 1], ord=2) ** 2
@@ -140,16 +146,26 @@ class SLIC(object):
             
             cluster.pixelsOfCluster.add((cluster.y, cluster.x))
     
-    def labelPixels(self, labWeight):
-        
+    # def labelPixels(self, labWeight):
+    def labelPixels(self):
+            
         """
         Label each pixel to the closest cluster relative to the LABXY-plane
 
         Input:
             labWeight - (Float) Value between 0.0 and 1.0 to adjust effectiveness of LAB distance during labeling
+                REMOVED: This should be done by M
+        """
+        """
+        Alterations from the original code
+        The original code used
+        D =  D = labWeight * labDistance + (1 - labWeight) * (self.M) * xyDistance
+        Thus using both self.M and labWeight to adjust the usage of LAB distance over Space Distance.
+        This has been modified so that D is consistent with the SLIC paper.
         """
         
-        it = self.S * 2
+        #it = self.S * 2
+        it = self.S # scan region of 2S x 2S, not 4S x 4S
         
         for cluster in self.clusters:
             
@@ -161,9 +177,12 @@ class SLIC(object):
                     
                     labDistance = math.sqrt((l - cluster.l)**2 + (a - cluster.a)**2 + (b - cluster.b)**2)
                     xyDistance = math.sqrt((x - cluster.x)**2 + (y - cluster.y)**2)
-                    
+                    """
                     # Avoiding scaling xyDistance by 1 / S for prettier superpixels
                     D = labWeight * labDistance + (1 - labWeight) * (self.M) * xyDistance
+                    """
+                    
+                    D = math.sqrt( labDistance**2 + (xyDistance * self.M / self.S)**2 )
                     
                     # Update if scaled distance is better than previous minimal distance
                     if D < self.distanceArr[y][x]:
@@ -396,7 +415,8 @@ class SLIC(object):
             
         io.imsave(path, color.lab2rgb(self.imageArr))
     
-    def execute(self, iterations, labWeight = 0.5, isBordered = True):
+    #def execute(self, iterations, labWeight = 0.5, isBordered = True):
+    def execute(self, iterations, isBordered = True):
         
         """
         Perform SLIC on image given number of iterations and compactness value
@@ -404,6 +424,7 @@ class SLIC(object):
         Input:
             iterations - (Int)   Number of iterations to perform SLIC
             labWeight -  (Float) Value between 0.0 and 1.0 to adjust effectiveness of LAB distance during labeling
+                REMOVED: this should be done by adjusting self.M
             isBordered - (Bool)  Boolean value representing if output will have borders around clusters
         """
         
@@ -413,7 +434,8 @@ class SLIC(object):
         for i in range(iterations):
             
             start = timeit.default_timer()
-            self.labelPixels(labWeight)
+            #self.labelPixels(labWeight)
+            self.labelPixels()
             self.updateCenters()
             self.enforceConnectivity()
             name = 'test_M{m}_K{k}_loop{loop}.png'.format(loop = i, m = self.M, k = self.K)
@@ -453,8 +475,48 @@ class SLIC(object):
         # Tracks distances to nearest cluster center (Initialized as largest possible value)
         self.distanceArr = np.full((self.height, self.width), np.inf)
 
+
+def main(lPath, K, M, iterations):
+    for path in lPath:
+        if os.path.isdir(path):
+            for subpath in os.listdir(path):
+                main(subpath, K, M, iterations)
+        if os.path.isfile(path):
+            processor = SLIC(path, K, M)
+            processor.execute(iterations, False)
+
+def main_getargs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(nargs='+',
+        dest = 'lPath',\
+        help = 'file or directory path(s) to execute SLIC')
+    parser.add_argument('-k', '--k',\
+        required = True,\
+        help = 'number of desired superpixels',\
+        dest = 'K')
+    parser.add_argument('-m', '--m',\
+        required = True,\
+        help = 'relative importance of space-distance over color-distance',\
+        dest = 'M')
+    parser.add_argument('-i', '--iterations',\
+        required = False,\
+        default = 10,
+        help = 'iterations of cluster adjusting to process (default:10)',
+        dest = 'iterations')
+    #To add: isBorderd, showNucleus
+    lPath = parser.parse_args().lPath
+    K = int(parser.parse_args().K)
+    M = float(parser.parse_args().M)
+    iterations = int(parser.parse_args().iterations)
+    
+    return lPath, K, M, iterations
+
 if __name__ == '__main__':
     
-    processor = SLIC('natterjack1.jpg', 5000, 10)
-    processor.execute(5, 0.2, False)
-    print("Hello World :^)")
+    lPath, K, M, iterations = main_getargs()
+    main(lPath, K, M, iterations)
+    
+    #processor = SLIC('natterjack2.jpg', 50, 0.01)
+    #processor.execute(5, 0.2, False)
+    #processor.execute(1,False)
+    #print("Hello World :^)")
