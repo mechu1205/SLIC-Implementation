@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from skimage import io, color
+from skimage import io, color, util
 import timeit # DEBUG
 import argparse
 import os
@@ -414,10 +414,10 @@ class SLIC(object):
                 
                 if showCenters: indicateClusterCenter(cluster.x, cluster.y)
             
-        io.imsave(path, color.lab2rgb(self.imageArr))
+        io.imsave(path, util.img_as_ubyte(color.lab2rgb(self.imageArr)))
     
     #def execute(self, iterations, labWeight = 0.5, isBordered = True):
-    def execute(self, iterations, showBordered, showCenters):
+    def execute(self, iterations, showBordered, showCenters, path):
         
         """
         Perform SLIC on image given number of iterations and compactness value
@@ -428,6 +428,7 @@ class SLIC(object):
                 REMOVED: this should be done by adjusting self.M
             showBorders - (Bool)  Boolean value representing if output will have borders around clusters
             showCenters - (Bool)  Boolean value representing if output will have cluster centers marked
+            path - (Str)    name of file
         """
         
         self.initializeClusters()
@@ -440,7 +441,7 @@ class SLIC(object):
             self.labelPixels()
             self.updateCenters()
             self.enforceConnectivity()
-            name = 'test_M{m}_K{k}_loop{loop}.png'.format(loop = i, m = self.M, k = self.K)
+            name = '{name}_M{m}_K{k}_loop{loop}.png'.format(name = path, loop = i+1, m = self.M, k = self.K)
             stop = timeit.default_timer()
             print("Runtime: ", stop - start)
             self.saveImage(name, showBorders, showCenters)
@@ -485,7 +486,7 @@ def main(lPath, K, M, iterations, showBorders, showCenters):
                 main(subpath, K, M, iterations, showBorders, showCenters)
         if os.path.isfile(path):
             processor = SLIC(path, K, M)
-            processor.execute(iterations, showBorders, showCenters)
+            processor.execute(iterations, showBorders, showCenters, path)
 
 def main_getargs():
     parser = argparse.ArgumentParser()
