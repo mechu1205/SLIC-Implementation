@@ -308,14 +308,15 @@ class SLIC(object):
                         pixelSet.remove(pixel)
                         bfsQueue.clear()
     
-    def saveImage(self, path, isBordered):
+    def saveImage(self, path, showBorders, showCenters):
         
         """
         Saves segmented image, along with borders and center indications, into path
 
         Input:
             path -       (String) File path/name for save location for image 
-            isBordered - (Bool)  Boolean value representing if output will have borders around clusters
+            showBorders - (Bool)  Boolean value representing if output will have borders around clusters
+            showCenters - (Bool)  Boolean value representing if output will have cluster centers marked
         """
         
         #################
@@ -375,7 +376,7 @@ class SLIC(object):
         
         self.imageArr = np.copy(self.colorArr)
         
-        if isBordered:
+        if showCenters:
             
             for cluster in self.clusters:
                 
@@ -396,7 +397,7 @@ class SLIC(object):
                         self.imageArr[py][px][1] = cluster.a
                         self.imageArr[py][px][2] = cluster.b
                     
-                indicateClusterCenter(cluster.x, cluster.y)
+                if showCenters: indicateClusterCenter(cluster.x, cluster.y)
         
         else:
             
@@ -411,12 +412,12 @@ class SLIC(object):
                     self.imageArr[py][px][1] = cluster.a
                     self.imageArr[py][px][2] = cluster.b
                 
-                indicateClusterCenter(cluster.x, cluster.y)
+                if showCenters: indicateClusterCenter(cluster.x, cluster.y)
             
         io.imsave(path, color.lab2rgb(self.imageArr))
     
     #def execute(self, iterations, labWeight = 0.5, isBordered = True):
-    def execute(self, iterations, isBordered = True):
+    def execute(self, iterations, showBordered, showCenters):
         
         """
         Perform SLIC on image given number of iterations and compactness value
@@ -425,7 +426,8 @@ class SLIC(object):
             iterations - (Int)   Number of iterations to perform SLIC
             labWeight -  (Float) Value between 0.0 and 1.0 to adjust effectiveness of LAB distance during labeling
                 REMOVED: this should be done by adjusting self.M
-            isBordered - (Bool)  Boolean value representing if output will have borders around clusters
+            showBorders - (Bool)  Boolean value representing if output will have borders around clusters
+            showCenters - (Bool)  Boolean value representing if output will have cluster centers marked
         """
         
         self.initializeClusters()
@@ -441,7 +443,7 @@ class SLIC(object):
             name = 'test_M{m}_K{k}_loop{loop}.png'.format(loop = i, m = self.M, k = self.K)
             stop = timeit.default_timer()
             print("Runtime: ", stop - start)
-            self.saveImage(name, False)
+            self.saveImage(name, showBorders, showCenters)
     
     def __init__(self, filepath, K = 10000, M = 10):
         
@@ -476,14 +478,14 @@ class SLIC(object):
         self.distanceArr = np.full((self.height, self.width), np.inf)
 
 
-def main(lPath, K, M, iterations):
+def main(lPath, K, M, iterations, showBorders, showCenters):
     for path in lPath:
         if os.path.isdir(path):
             for subpath in os.listdir(path):
-                main(subpath, K, M, iterations)
+                main(subpath, K, M, iterations, showBorders, showCenters)
         if os.path.isfile(path):
             processor = SLIC(path, K, M)
-            processor.execute(iterations, False)
+            processor.execute(iterations, showBorders, showCenters)
 
 def main_getargs():
     parser = argparse.ArgumentParser()
@@ -501,20 +503,33 @@ def main_getargs():
     parser.add_argument('-i', '--iterations',\
         required = False,\
         default = 10,
-        help = 'iterations of cluster adjusting to process (default:10)',
+        help = 'iterations of cluster adjusting to process (default: 10)',
         dest = 'iterations')
-    #To add: isBorderd, showNucleus
+    parser.add_argument('-b', '--show-border',\
+        required = False,\
+        default = False,\
+        help = 'show cluster borders (default: False)',\
+        dest = 'showBorders')
+    parser.add_argument('-c', '--show-center',\
+        required = False,\
+        default = False,\
+        help = 'show cluster centers (default: False)',\
+        dest = 'showCenters')
+    
+    #To add: isBorderd, showClusterCenter
     lPath = parser.parse_args().lPath
     K = int(parser.parse_args().K)
     M = float(parser.parse_args().M)
     iterations = int(parser.parse_args().iterations)
+    showBorders = bool(parser.parse_args().showBorders)
+    showCenters = bool(parser.parse_args().showCenters)
     
-    return lPath, K, M, iterations
+    return lPath, K, M, iterations, showBorders, showCenters
 
 if __name__ == '__main__':
     
-    lPath, K, M, iterations = main_getargs()
-    main(lPath, K, M, iterations)
+    lPath, K, M, iterations, showBorders, showCenters = main_getargs()
+    main(lPath, K, M, iterations, showBorders, showCenters)
     
     #processor = SLIC('natterjack2.jpg', 50, 0.01)
     #processor.execute(5, 0.2, False)
